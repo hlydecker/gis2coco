@@ -1,10 +1,10 @@
 import json
-import pandas as pd
-import numpy as np
+import cv2
 import geopandas as gpd
 import rasterio as rio
 from osgeo import osr, ogr, gdal
 from shapely.geometry import Polygon, mapping, MultiPoint
+
 
 def spatial_to_pixel(geo_matrix, x, y):
     """
@@ -18,6 +18,7 @@ def spatial_to_pixel(geo_matrix, x, y):
     pixel = int((x - ul_x) / x_dist)
     line = -int((ul_y - y) / y_dist)
     return pixel, line
+
 
 def spatial_polygon_to_pixel(raster, geojson, selected_polygon=1):
     
@@ -33,6 +34,7 @@ def spatial_polygon_to_pixel(raster, geojson, selected_polygon=1):
     
     return(converted_coords)
 
+
 def spatial_polygons_to_pixels(raster, geojson):
     
     raster = gdal.Open(raster)
@@ -45,24 +47,25 @@ def spatial_polygons_to_pixels(raster, geojson):
         
     return(pixel_poly_list)
 
+
 """
 COCO JSON Creation
 """
 
-class coco_json: 
+class CocoJson: 
     def toJSON(self):
         return(json.dumps(self, default=lambda o: o.__dict__, indent = 4))
     
-    class coco_image: 
+    class CocoImage: 
         pass
     
-    class coco_images: 
+    class CocoImages: 
         pass
         
-    class coco_poly_ann: 
+    class CocoPolyAnn: 
         pass
     
-    class coco_poly_anns: 
+    class CocoPolyAnns: 
         pass
 
     
@@ -79,9 +82,10 @@ def coco_bbox(polygon):
     cc_bbox = [top_left_x, top_left_y, width, height] #https://www.immersivelimit.com/tutorials/create-coco-annotations-from-scratch/#coco-dataset-format
     return(cc_bbox)
 
+
 def coco_polygon_annotation(pixel_polygon):
     
-    annot = coco_json.coco_poly_ann()
+    annot = CocoJson.CocoPolyAnn()
     annot.segmentation = [item for sublist in pixel_polygon for item in sublist]
     annot.area = Polygon(pixel_polygon).area
     annot.iscrowd = 0
@@ -93,10 +97,12 @@ def coco_polygon_annotation(pixel_polygon):
     
     return(annot)
 
+
 def coco_polygon_annotations(pixel_poly_list):
-    annotations = coco_json.coco_poly_anns()
+    annotations = CocoJson.CocoPolyAnns()
     annotations.annotations = [coco_polygon_annotation(pixel_poly) for pixel_poly in pixel_poly_list]
     return(annotations)
+
 
 def raster_to_coco(raster_file):
     """
@@ -105,7 +111,7 @@ def raster_to_coco(raster_file):
     
     raster = cv2.imread(raster_file)
     
-    image = coco_json.coco_image()
+    image = CocoJson.CocoImage()
     image.license = 1
     image.filename = raster_file
     image.height = raster.shape[0]
@@ -114,7 +120,9 @@ def raster_to_coco(raster_file):
 
     return(image)
 
+
 def coco_image_annotations(raster_file_list):
-    images = coco_json.coco_images()
+    images = CocoJson.CocoImages()
     images.images = [raster_to_coco(raster_file) for raster_file in raster_file_list]
     return(images)
+
