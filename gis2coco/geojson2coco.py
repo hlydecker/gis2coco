@@ -1,9 +1,60 @@
-import json
+import argparse
 import cv2
 import geopandas as gpd
+import json
+import os.path
 import rasterio as rio
+
+from itertools import product
 from osgeo import osr, ogr, gdal
+from rasterio import windows
 from shapely.geometry import Polygon, mapping, MultiPoint
+
+
+def get_tiles(ds, width=2000, height=2000, map_units=False):
+
+    """
+    Defines a set of tiles over a raster layer based on user specified dimensions.
+
+    Args:
+        ds: a raster layer that has been read into memory
+        width: integer defining the width of tiles
+        length: integer defining the length of tiles
+        map_units: boolean specifying if width and height at in map units.
+    """
+
+    if map_units:
+        # Get pixel size
+        px, py = ds.transform.a, -ds.transform.e
+        width, height = int(width / px + 0.5) , int(height / px + 0.5)
+
+    ncols, nrows = ds.meta['width'], ds.meta['height']
+
+    offsets = product(range(0, ncols, width), range(0, nrows, height))
+    big_window = windows.Window(col_off=0, row_off=0, width=ncols, height=nrows)
+    for col_off, row_off in  offsets:
+        window =windows.Window(col_off=col_off, row_off=row_off, width=width, height=height).intersection(big_window)
+        transform = windows.transform(window, ds.transform)
+        yield window, transform
+
+def write_raster_tiles(infile, out_path):
+
+    output_filename = "tile_{}-{}.tif"
+
+    with rio.open(infile) as inds:
+    
+        tile_width, tile_height = 2000, 2000  
+
+        meta = inds.meta.copy()
+
+        for window, transform in get_tiles(inds, tile_width, tile_height, map_units=True):
+
+            meta['transform'] = transform
+            meta['width'], meta['height'] = window.width, window.height
+            outpath = os.path.join(out_path,output_filename.format(int(window.col_off), int(window.row_off)))
+            with rio.open(outpath, 'w', **meta) as outds:
+                outds.write(inds.read(window=window))
+
 
 
 def spatial_to_pixel(geo_matrix, x, y):
@@ -126,3 +177,14 @@ def coco_image_annotations(raster_file_list):
     images.images = [raster_to_coco(raster_file) for raster_file in raster_file_list]
     return(images)
 
+#%% Command-line driver
+
+def main(args=None):
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--polygon-dir", required=True, default=".", type=Path)
+    ap.add_argument("--raster-dir", required=True, type=Path)
+    ap.add_argument("-o", "--out-path", default="coco_from_gis.json", type=Path)
+    args = ap.parse_args(args)
+
+if __name__ == '__main__':
+    main()
