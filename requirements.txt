@@ -1,0 +1,11 @@
+argparse
+cv2
+geopandas
+glob
+json
+pandas
+rasterio
+pathlib
+itertools
+osgeo
+shapely.geometry
