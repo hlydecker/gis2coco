@@ -130,25 +130,30 @@ def raster_to_coco(raster_file, ind):
     Generate a COCO format image object from a raster file.
     """
     
+    try:
+        image_extension
+    except NameError:
+        image_extension = ".png"
+
     raster = cv2.imread(raster_file)
     # Create a jpg filename and rewrite as a jpg
-    file_name = os.path.splitext(raster_file)[0]
-    jpg_name = f"{file_name}.png"
+    raster_name = os.path.splitext(raster_file)[0]
+    image_name = f"{raster_name}.{image_extension}"
     
     # Write a jpg of the raster tile
-    if not os.path.isfile(jpg_name):
+    if not os.path.isfile(image_name):
         translate_options = gdal.TranslateOptions(format='PNG',
                                           outputType=gdal.GDT_Byte,
                                           scaleParams=['']
                                           )
-        gdal.Translate(destName=jpg_name, srcDS=raster_file, options=translate_options)
+        gdal.Translate(destName=image_name, srcDS=raster_file, options=translate_options)
 
 
         
     # Create each individual image object
     image = coco_json.coco_image()
     image.license = 1
-    image.filename = jpg_name
+    image.filename = os.path.basename(image_name)
     image.height = raster.shape[0]
     image.width = raster.shape[1]
     image.id = ind
@@ -286,6 +291,7 @@ def main(args=None):
     ap.add_argument("--json-name", default="coco_from_gis.json", type=Path)
     ap.add_argument("--crs", type = str, help = "Specifiy the project crs to use.")
     ap.add_argument("--cleanup", default = False, type = bool, help = "If set to true, will purge *.tif tiles from the directory. Default to false.")
+    ap.add_argument("--short-file-name", type = bool, help = "If True, saves a short file name in the COCO for images.")
     args = ap.parse_args(args)
 
     """
