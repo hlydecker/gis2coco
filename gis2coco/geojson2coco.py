@@ -130,6 +130,7 @@ def raster_to_coco(raster_file, ind):
     Generate a COCO format image object from a raster file.
     """
     
+    # TODO: Make this more intelligent.
     try:
         image_extension
     except NameError:
@@ -138,22 +139,25 @@ def raster_to_coco(raster_file, ind):
     raster = cv2.imread(raster_file)
     # Create a jpg filename and rewrite as a jpg
     raster_name = os.path.splitext(raster_file)[0]
-    image_name = f"{raster_name}.{image_extension}"
+    image_name = f"{raster_name}{image_extension}"
     
     # Write a jpg of the raster tile
     if not os.path.isfile(image_name):
-        translate_options = gdal.TranslateOptions(format='PNG',
-                                          outputType=gdal.GDT_Byte,
-                                          scaleParams=['']
-                                          )
-        gdal.Translate(destName=image_name, srcDS=raster_file, options=translate_options)
+        gdal_command_string = f"gdal_translate -of 'PNG' {raster_file} {image_name}"
+        os.system(gdal_command_string)
+
+        # translate_options = gdal.TranslateOptions(format='PNG',
+        #                                   outputType=gdal.GDT_Byte,
+        #                                   scaleParams=['']
+        #                                   )
+        # gdal.Translate(destName=image_name, srcDS=raster_file, options=translate_options)
 
 
         
     # Create each individual image object
     image = coco_json.coco_image()
     image.license = 1
-    image.filename = os.path.basename(image_name)
+    image.file_name = os.path.basename(image_name)
     image.height = raster.shape[0]
     image.width = raster.shape[1]
     image.id = ind
@@ -227,7 +231,7 @@ def coco_polygon_annotation(pixel_polygon, image_id, annot_id):
         "iscrowd": 0,
         "image_id": image_id,
         "bbox": coco_bbox(Polygon(pixel_polygon)),
-        "category_id": 1,
+        "category_id": pixel_polygon['class_id'],
         "id": annot_id
             }
     
@@ -261,9 +265,18 @@ info_json = {
         "date_created": "2022/10/12"
     }
 
-categories_json = [
-    {"supercategory": "agriculture","id": 1,"name": "paddock"}
-]
+def make_category_object(geojson):
+    
+    categories = geojson['class'].unique()
+    class_ids = geojson['class_id'].unique()
+    
+    # TODO: Make this less hardcoded
+    categories_json = [
+        {"supercategory": "other","id": class_ids[0],"name": f"{categories[0]}"},
+        {"supercategory": "agriculture","id": class_ids[1],"name": f"{categories[1]}"}
+        ]
+    
+    return(categories_json)
 
 
 def assemble_coco_json(raster_file_list, geojson, license_json, info_json, categories_json):
@@ -327,6 +340,10 @@ def main(args=None):
     # Read geojson file.
     geojson = gpd.read_file(args.polygon_file)
     geojson = geojson.to_crs({'init': 'epsg:3577'})
+
+    # Create class_id for category mapping
+    geojson['class_id'] = geojson.groupby('class').ngroup()
+    categories_json = make_category_object(geojson)
 
     print("Converting to COCO")
     # We are now ready to make the COCO JSON.
