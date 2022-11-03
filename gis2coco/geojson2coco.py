@@ -223,7 +223,7 @@ def coco_bbox(polygon):
     return(cc_bbox)
 
 
-def coco_polygon_annotation(pixel_polygon, image_id, annot_id):
+def coco_polygon_annotation(pixel_polygon, image_id, annot_id, class_id):
     
     annot = {
         "segmentation":[item for sublist in pixel_polygon for item in sublist],
@@ -231,7 +231,7 @@ def coco_polygon_annotation(pixel_polygon, image_id, annot_id):
         "iscrowd": 0,
         "image_id": image_id,
         "bbox": coco_bbox(Polygon(pixel_polygon)),
-        "category_id": pixel_polygon['class_id'],
+        "category_id": class_id,
         "id": annot_id
             }
     
@@ -242,7 +242,7 @@ def coco_polygon_annotations(polygon_df):
     
     annotations_tmp = []
     for index, row in polygon_df.iterrows():
-        annotations_tmp.append(coco_polygon_annotation(row['pixel_polygon'], row['image_id'], row['annot_id']))
+        annotations_tmp.append(coco_polygon_annotation(row['pixel_polygon'], row['image_id'], row['annot_id'], row['class_id']))
         
     return(annotations_tmp)
 
