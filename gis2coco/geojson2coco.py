@@ -79,12 +79,12 @@ def get_tile_polygons(raster_tile, geojson, project_crs = "EPSG:3577", filter = 
     tile_polygons = geojson.clip(raster_extent)
     # Split multipolygon 
     tile_polygons = tile_polygons.explode(index_parts=False)
-    tile_polygons = tile_polygons.reset_index()
+    tile_polygons = tile_polygons.reset_index(drop=True)
     # Filter out zero area polygons
     tile_polygons = tile_polygons[tile_polygons.geometry.area > 0]
     if filter == True:
         tile_polygons = tile_polygons[tile_polygons.geometry.area > 5000]
-    tile_polygons = tile_polygons.reset_index()
+    tile_polygons = tile_polygons.reset_index(drop=True)
     
     return(tile_polygons)
 
@@ -197,7 +197,8 @@ def pixel_polygons_for_raster_tiles(raster_file_list, geojson):
         tmp['image_id'] = index
         tmp_list.append(tmp)
         
-    pixel_df = pd.concat(tmp_list)
+    pixel_df = pd.concat(tmp_list).reset_index() 
+    pixel_df = pixel_df.drop(columns=['index'])
     pixel_df['pixel_polygon'] = pixel_df.apply(lambda row: spatial_polygon_to_pixel(row['raster_tile'], row['geometry']), axis = 1)
     pixel_df['annot_id'] = range(0, 0+len(pixel_df))
     
@@ -271,6 +272,7 @@ def make_category_object(geojson):
     class_ids = geojson['class_id'].unique()
     
     # TODO: Make this less hardcoded
+    # FIXME: this is very risky and problematic
     categories_json = [
         {"supercategory": "other","id": class_ids[0],"name": f"{categories[0]}"},
         {"supercategory": "agriculture","id": class_ids[1],"name": f"{categories[1]}"}
@@ -286,9 +288,9 @@ def assemble_coco_json(raster_file_list, geojson, license_json, info_json, categ
     coco = coco_json()
     coco.images = coco_image_annotations(raster_file_list).images
     coco.annotations = coco_polygon_annotations(pixel_poly_df)
-    coco.license = license_json
-    coco.categories = categories_json
-    coco.info = info_json
+    coco.license = str(license_json)
+    coco.categories = str(categories_json)
+    coco.info = str(info_json)
     
     return(coco)
 
