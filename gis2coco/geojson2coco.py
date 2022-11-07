@@ -266,19 +266,36 @@ info_json = {
         "date_created": "2022/10/12"
     }
 
-def make_category_object(geojson):
+def make_category(class_name, class_id, trim = 0):
     
-    categories = geojson['class'].unique()
-    class_ids = geojson['class_id'].unique()
+    """
+    Function to build an individual COCO category
+    """
+
+    category = {
+        "supercategory": "landuse",
+        "id": int(class_id),
+        "name": class_name[trim:]
+    }
+    return(category)
+
+def make_category_object(geojson, class_column, trim):
+
+    """
+    Function to build a COCO categories object.
+    """
     
-    # TODO: Make this less hardcoded
-    # FIXME: this is very risky and problematic
-    categories_json = [
-        {"supercategory": "other","id": class_ids[0],"name": f"{categories[0]}"},
-        {"supercategory": "agriculture","id": class_ids[1],"name": f"{categories[1]}"}
-        ]
+    # TODO: Implement way to read supercategory data.
     
-    return(categories_json)
+    classes = pd.DataFrame(geojson[class_column].unique(), columns = ["class"])
+    classes['class_id'] = classes.index
+    categories_json = []
+    
+    for index, row in classes.iterrows():
+        categories_json.append(make_category(row["class"], row["class_id"], trim))
+    
+    return(categories_json)    
+        
 
 
 def assemble_coco_json(raster_file_list, geojson, license_json, info_json, categories_json):
@@ -288,9 +305,9 @@ def assemble_coco_json(raster_file_list, geojson, license_json, info_json, categ
     coco = coco_json()
     coco.images = coco_image_annotations(raster_file_list).images
     coco.annotations = coco_polygon_annotations(pixel_poly_df)
-    coco.license = str(license_json)
-    coco.categories = str(categories_json)
-    coco.info = str(info_json)
+    coco.license = license_json
+    coco.categories = categories_json
+    coco.info = info_json
     
     return(coco)
 
@@ -303,8 +320,10 @@ def main(args=None):
     ap.add_argument("--raster-file", required=True, type=Path)
     ap.add_argument("--tile-size", default = 1000, type=int, help = "Int length in meters of square tiles to generate from raster. Defaults to 1000 meters.")
     ap.add_argument("--tile-dir", required = True, type = Path)
+    ap.add_argument("--class-column", type = str, help = "Column name in GeoJSON where classes are stored.")
     ap.add_argument("--json-name", default="coco_from_gis.json", type=Path)
     ap.add_argument("--crs", type = str, help = "Specifiy the project crs to use.")
+    ap.add_argument("--trim-class", default = 0, type = int, help = "Characters to trim of the start of each class name. A clummsy solution, set to 0 by default which leaves class names as is.")
     ap.add_argument("--cleanup", default = False, type = bool, help = "If set to true, will purge *.tif tiles from the directory. Default to false.")
     ap.add_argument("--short-file-name", type = bool, help = "If True, saves a short file name in the COCO for images.")
     args = ap.parse_args(args)
@@ -344,8 +363,8 @@ def main(args=None):
     geojson = geojson.to_crs({'init': 'epsg:3577'})
 
     # Create class_id for category mapping
-    geojson['class_id'] = geojson.groupby('class').ngroup()
-    categories_json = make_category_object(geojson)
+    geojson['class_id'] = geojson[args.class_column].factorize()[0]
+    categories_json = make_category_object(geojson, args.class_column, args.trim_class)
 
     print("Converting to COCO")
     # We are now ready to make the COCO JSON.
