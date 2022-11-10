@@ -247,24 +247,6 @@ def coco_polygon_annotations(polygon_df):
         
     return(annotations_tmp)
 
-"""
-Create dataset level objects
-"""
-
-license_json = {
-        "url": "http://creativecommons.org/licenses/by-nc-sa/2.0/",
-        "id": 1,
-        "name": "Attribution-NonCommercial-ShareAlike License"
-    }
-
-info_json = {
-        "description": "ePaddocks small test",
-        "url": "https://github.com/Sydney-Informatics-Hub/PIPE-3210-Paddock-CV/tree/s4a-dev/data/epaddocks_test",
-        "version": "0.1.0",
-        "year": 2022,
-        "contributor": "Henry Lydecker",
-        "date_created": "2022/10/12"
-    }
 
 def make_category(class_name, class_id, trim = 0):
     
@@ -326,6 +308,8 @@ def main(args=None):
     ap.add_argument("--trim-class", default = 0, type = int, help = "Characters to trim of the start of each class name. A clummsy solution, set to 0 by default which leaves class names as is.")
     ap.add_argument("--cleanup", default = False, type = bool, help = "If set to true, will purge *.tif tiles from the directory. Default to false.")
     ap.add_argument("--short-file-name", type = bool, help = "If True, saves a short file name in the COCO for images.")
+    ap.add_argument("--license", type = Path, help = "Path to a license description in COCO JSON format. If not supplied, will default to MIT license.")
+    ap.add_argument("--info", required = True, type = Path, help = "Path to info description in COCO JSON format.")
     args = ap.parse_args(args)
 
     """
@@ -365,6 +349,20 @@ def main(args=None):
     # Create class_id for category mapping
     geojson['class_id'] = geojson[args.class_column].factorize()[0]
     categories_json = make_category_object(geojson, args.class_column, args.trim_class)
+
+    # If license is not supplied, use MIT by default
+    if args.license is None:
+        license_json = {
+            "url": "http://creativecommons.org/licenses/by-nc-sa/2.0/",
+            "id": 1,
+            "name": "Attribution-NonCommercial-ShareAlike License"
+            }
+    else:
+        # Read user supplied license
+        # TODO: incorporate different licenses depending on images: this feature is almost never used but would be nice to support.
+        license_json = open(args.license, 'r')
+
+    info_json = open(args.info, 'r')
 
     print("Converting to COCO")
     # We are now ready to make the COCO JSON.
