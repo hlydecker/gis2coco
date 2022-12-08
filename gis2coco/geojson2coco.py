@@ -307,6 +307,7 @@ def main(args=None):
     ap.add_argument("--crs", type = str, help = "Specifiy the project crs to use.")
     ap.add_argument("--trim-class", default = 0, type = int, help = "Characters to trim of the start of each class name. A clummsy solution, set to 0 by default which leaves class names as is.")
     ap.add_argument("--cleanup", default = False, type = bool, help = "If set to true, will purge *.tif tiles from the directory. Default to false.")
+    ap.add_argument("--save-gdf", default = True, type = bool, help = "If set to true, will save a GeoDataFrame that you can use to reconstruct a spatial version of the dataset.")
     ap.add_argument("--short-file-name", type = bool, help = "If True, saves a short file name in the COCO for images.")
     ap.add_argument("--license", type = Path, help = "Path to a license description in COCO JSON format. If not supplied, will default to MIT license.")
     ap.add_argument("--info", required = True, type = Path, help = "Path to info description in COCO JSON format.")
@@ -372,6 +373,13 @@ def main(args=None):
     with open (args.json_name, "w") as f:
         f.write(spatial_coco.toJSON())
     print(f"COCO JSON saved to {args.json_name}")
-
+    
+    if args.save_gdf == True:
+        
+        pixel_poly_df['raster_tile_name'] = pixel_poly_df.apply(lambda row: os.path.basename(row['raster_tile']), axis = 1)
+        
+        with open ("gdf_output.csv, "w") as f:
+            f.write(pixel_poly_df)
+    
 if __name__ == '__main__':
     main()
