@@ -15,50 +15,6 @@ from rasterio import windows
 from shapely.geometry import Polygon, MultiPoint, box
 
 
-def get_tiles(ds, width=2000, height=2000, map_units=False):
-
-    """
-    Defines a set of tiles over a raster layer based on user specified dimensions.
-
-    Args:
-        ds: a raster layer that has been read into memory
-        width: integer defining the width of tiles
-        length: integer defining the length of tiles
-        map_units: boolean specifying if width and height at in map units.
-    """
-
-    if map_units:
-        # Get pixel size
-        px, py = ds.transform.a, -ds.transform.e
-        width, height = int(width / px + 0.5) , int(height / px + 0.5)
-
-    ncols, nrows = ds.meta['width'], ds.meta['height']
-
-    offsets = product(range(0, ncols, width), range(0, nrows, height))
-    big_window = windows.Window(col_off=0, row_off=0, width=ncols, height=nrows)
-    for col_off, row_off in  offsets:
-        window =windows.Window(col_off=col_off, row_off=row_off, width=width, height=height).intersection(big_window)
-        transform = windows.transform(window, ds.transform)
-        yield window, transform
-
-def write_raster_tiles(infile, out_path):
-
-    output_filename = "tile_{}-{}.tif"
-
-    with rio.open(infile) as inds:
-    
-        tile_width, tile_height = 2000, 2000  
-
-        meta = inds.meta.copy()
-
-        for window, transform in get_tiles(inds, tile_width, tile_height, map_units=True):
-
-            meta['transform'] = transform
-            meta['width'], meta['height'] = window.width, window.height
-            outpath = os.path.join(out_path,output_filename.format(int(window.col_off), int(window.row_off)))
-            with rio.open(outpath, 'w', **meta) as outds:
-                outds.write(inds.read(window=window))
-
 def get_tile_polygons(raster_tile, geojson, project_crs = "EPSG:3577", filter = True):
     
     """
@@ -299,8 +255,6 @@ def assemble_coco_json(raster_file_list, geojson, license_json, info_json, categ
 def main(args=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--polygon-file", required=True, default=".", type=Path)
-    ap.add_argument("--raster-file", required=True, type=Path)
-    ap.add_argument("--tile-size", default = 1000, type=int, help = "Int length in meters of square tiles to generate from raster. Defaults to 1000 meters.")
     ap.add_argument("--tile-dir", required = True, type = Path)
     ap.add_argument("--class-column", type = str, help = "Column name in GeoJSON where classes are stored.")
     ap.add_argument("--json-name", default="coco_from_gis.json", type=Path)
@@ -313,35 +267,14 @@ def main(args=None):
     args = ap.parse_args(args)
 
     """
-    Read in raster file and save tiles.
+    Read in raster tiles.
     """
-    print(f"Creating {args.tile_size} m^2 tiles from {args.raster_file}")
-    infile = args.raster_file
-    out_path = args.tile_dir
-    output_filename = 'tile_{}-{}.tif'
-
-    with rio.open(infile) as inds:
-        tile_width, tile_height = args.tile_size, args.tile_size 
-
-        meta = inds.meta.copy()
-
-        for window, transform in get_tiles(inds, tile_width, tile_height, map_units=True):
-
-            meta['transform'] = transform
-            meta['width'], meta['height'] = window.width, window.height
-            outpath = os.path.join(out_path,output_filename.format(int(window.col_off), int(window.row_off)))
-            with rio.open(outpath, 'w', **meta) as outds:
-                outds.write(inds.read(window=window))
-
-    # Close the big raster now that we are done with it.
-    inds.close()
-
     # Read raster tiles into a list.
     raster_file_list = []
-    for filename in glob.iglob(f'{out_path}/*.tif'):
+    for filename in glob.iglob(f'{args.tile_dir}/*.tif'):
         raster_file_list.append(filename)
 
-    print(f"{len(raster_file_list)} raster tiles created")
+    print(f"Processing {len(raster_file_list)} raster tiles.")
     # Read geojson file.
     geojson = gpd.read_file(args.polygon_file)
     geojson = geojson.to_crs({'init': 'epsg:3577'})
