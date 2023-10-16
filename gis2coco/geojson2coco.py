@@ -378,7 +378,7 @@ def main(args=None):
         
         pixel_poly_df['raster_tile_name'] = pixel_poly_df.apply(lambda row: os.path.basename(row['raster_tile']), axis = 1)
         
-        with open ("gdf_output.csv, "w") as f:
+        with open ("gdf_output.csv", "w") as f:
             f.write(pixel_poly_df)
     
 if __name__ == '__main__':
